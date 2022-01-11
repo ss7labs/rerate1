@@ -7,6 +7,7 @@ import (
 	_ "github.com/mailru/go-clickhouse"
 	"math"
 	"strconv"
+	"regexp"
 )
 
 type CallDetail struct {
@@ -68,6 +69,10 @@ func (org *Org) printOneOrg() {
 		if err := rows.Scan(&phone); err != nil {
 			panic(err.Error())
 		}
+		if m,_ := regexp.MatchString(`4438[0-6][0-9]`, phone) ; !m {
+			continue
+		}
+
 		org.printOnePhone(phone)
 	}
 	if org.addFooter() {
