@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"regexp"
 	"strings"
-	// "fmt"
+	//"fmt"
 	"github.com/sirupsen/logrus"
 )
 
@@ -26,9 +26,16 @@ func (nd NumberDirection) DirectionByPrefix(prefix string) string {
 
 func SplitNumber(number string, sd SearchDirection) SplittedNumber {
 	sn := SplittedNumber{}
-	prefix := matchedPrefix(number)
-	s := strings.Split(number, prefix)
-	sn.Remained = s[1]
+	var prefix string
+	m, _ := regexp.MatchString(`^[1-9]\d{5}$`, number)
+	if m {
+		prefix = "80012"
+		sn.Remained = number
+	} else {
+		prefix = matchedPrefix(number)
+		s := strings.Split(number, prefix)
+		sn.Remained = s[1]
+	}
 	sn.Direction = sd.DirectionByPrefix(prefix)
 	return sn
 }

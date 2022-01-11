@@ -6,8 +6,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/mailru/go-clickhouse"
 	"math"
-	"strconv"
 	"regexp"
+	"strconv"
 )
 
 type CallDetail struct {
@@ -66,14 +66,13 @@ func (org *Org) printOneOrg() {
 	org.addHeader()
 	for rows.Next() {
 		var phone string
+		m := false
 		if err := rows.Scan(&phone); err != nil {
 			panic(err.Error())
 		}
-		if m,_ := regexp.MatchString(`4438[0-6][0-9]`, phone) ; !m {
-			continue
-		}
+		m, _ = regexp.MatchString(`4438[0-6][0-9]`, phone)
 
-		org.printOnePhone(phone)
+		org.printOnePhone(phone, m)
 	}
 	if org.addFooter() {
 		org.printPageToFile()
@@ -82,7 +81,23 @@ func (org *Org) printOneOrg() {
 	//org.printPage()
 }
 
-func (org *Org) printOnePhone(phone string) {
+func getSeconds(query string) int {
+	var seconds int
+	err := chdb.QueryRow(query).Scan(&seconds)
+	if err != nil {
+		fmt.Println("Error when get calls for ", err.Error())
+		return 0
+	}
+
+	if err != nil && err == sql.ErrNoRows {
+		fmt.Println("No calls")
+		return 0
+	}
+
+	return seconds
+}
+
+func (org *Org) printOnePhone(phone string, rerate bool) {
 	org.phoneTotalUsd = 0
 	org.phoneTotalOrg = 0
 	org.phonePrintControl = &PhonePrintControl{DetailsBlockExists: false, LocalsBlockExists: false, PstnExists: false}
@@ -130,15 +145,20 @@ func (org *Org) printOnePhone(phone string) {
 	query = "SELECT sum(rate_usd),sum(rate_org) FROM rated WHERE toYYYYMM(event_date)='" + org.Date + "' AND numb LIKE '8%' AND numb NOT LIKE '810%' AND numa='" + phone + "' GROUP BY numa"
 	totalUsd, totalOrg = getSum(query)
 
+	if totalOrg > 0 && !rerate {
+		query := "SELECT event_time,numb,duration,rate_usd,rate_org FROM rated WHERE toYYYYMM(event_date)='" + org.Date + "' AND numb LIKE '8%' AND numb NOT LIKE '810%' AND numa='" + phone + "' ORDER BY event_time"
+		org.callsDetails(query, phone)
+	}
+	if totalOrg > 0 && rerate {
+		query := "SELECT event_time,numb,duration FROM rated WHERE toYYYYMM(event_date)='" + org.Date + "' AND numb NOT LIKE '810%' AND numa='" + phone + "' ORDER BY event_time"
+		totalOrg, totalUsd = org.callsDetails01(query, phone)
+	}
 	if totalOrg > 0 {
-		//fmt.Println("Turkmenistan total",phone,totalUsd,totalOrg)
 		org.TkmCallsTotal.Usd += totalUsd
 		org.TkmCallsTotal.Man += totalOrg
 		org.phoneTotalUsd += totalUsd
 		org.phoneTotalOrg += totalOrg
 		org.phonePrintControl.DetailsBlockExists = true
-		query := "SELECT event_time,numb,duration,rate_usd,rate_org FROM rated WHERE toYYYYMM(event_date)='" + org.Date + "' AND numb LIKE '8%' AND numb NOT LIKE '810%' AND numa='" + phone + "' ORDER BY event_time"
-		org.callsDetails(query, phone)
 		s := fmt.Sprintf("%7s%-51s%10.2f%10.2f", "", "Всего по телефону разговоров по Туркменистану", totalUsd, totalOrg)
 		org.addLine(s)
 	}
@@ -147,10 +167,10 @@ func (org *Org) printOnePhone(phone string) {
 	/*
 	 ** Get Total of Local non 810 and non 8 calls
 	 */
-	query = "SELECT sum(rate_usd),sum(rate_org) FROM rated WHERE toYYYYMM(event_date)='" + org.Date + "' AND numb NOT LIKE '8%' AND numa='" + phone + "' GROUP BY numa"
 	totalUsd, totalOrg = 0.0, 0.0
 
-	if org.Firma != 3 {
+	if org.Firma != 3 && !rerate {
+		query = "SELECT sum(rate_usd),sum(rate_org) FROM rated WHERE toYYYYMM(event_date)='" + org.Date + "' AND numb NOT LIKE '8%' AND numa='" + phone + "' GROUP BY numa"
 		totalUsd, totalOrg = getSum(query)
 	}
 
@@ -208,6 +228,32 @@ func (org *Org) printOnePhone(phone string) {
 	}
 }
 
+func (org *Org) callsDetails01(query, phone string) (float64, float64) {
+	var usd, man float64
+	rows, err := chdb.Query(query)
+	if err != nil {
+		panic(err.Error())
+	}
+	defer rows.Close()
+	count := 0
+	for rows.Next() {
+		var cd CallDetail
+		if err := rows.Scan(&cd.DTime, &cd.Numb, &cd.DurSec); err != nil {
+			panic(err.Error())
+		}
+		if count == 0 {
+			cd.PrintNuma = true
+			cd.Numa = phone
+			count++
+		}
+		cd.Man = float64(secToMin(cd.DurSec)) * 0.1
+		cd.Usd = cd.Man / 2.86
+		man += cd.Man
+		usd += cd.Usd
+		org.prepareDetailRow(cd)
+	}
+	return man, usd
+}
 func (org *Org) callsDetails(query, phone string) {
 	rows, err := chdb.Query(query)
 	if err != nil {
