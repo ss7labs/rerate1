@@ -8,11 +8,16 @@ import (
 	"time"
 )
 
-func (org *Org) alignDstNumb(dst, numb string) string {
+func (org *Org) alignDstNumb(dst, numb string,kz int) string {
+	kzStr := ""
+	if kz != 0 {
+	    kzStr = "(к/з)"
+	}
 	l1 := len([]rune(dst))
-	l2 := 24 - l1
-	format := "%s%" + strconv.Itoa(l2) + "s"
-	s := fmt.Sprintf(format, dst, numb)
+	lKz := len([]rune(kzStr))
+	l2 := 24 - l1 - lKz
+	format := "%s%"+strconv.Itoa(lKz)+"s%" + strconv.Itoa(l2) + "s"
+	s := fmt.Sprintf(format, dst,kzStr,numb)
 	return s
 }
 

@@ -18,7 +18,9 @@ type CallDetail struct {
 	Usd       float64
 	Man       float64
 	PrintNuma bool
+	Kz	  int
 }
+
 type TotalDual struct {
 	Usd float64
 	Man float64
@@ -114,7 +116,7 @@ func (org *Org) printOnePhone(phone string, rerate bool) {
 		org.phoneTotalUsd += totalUsd
 		org.phoneTotalOrg += totalOrg
 		org.phonePrintControl.DetailsBlockExists = true
-		query := "SELECT event_time,numb,duration,rate_usd,rate_org FROM rated WHERE toYYYYMM(event_date)='" + org.Date + "' AND numb LIKE '810%' AND numb NOT LIKE '8107%' AND numa='" + phone + "' ORDER BY event_time"
+		query := "SELECT event_time,numb,duration,rate_usd,rate_org,kz FROM rated WHERE toYYYYMM(event_date)='" + org.Date + "' AND numb LIKE '810%' AND numb NOT LIKE '8107%' AND numa='" + phone + "' ORDER BY event_time"
 		org.callsDetails(query, phone)
 		s := fmt.Sprintf("%7s%-51s%10.2f%10.2f", "", "Всего по телефону меж.переговоров", totalUsd, totalOrg)
 		org.addLine(s)
@@ -133,7 +135,7 @@ func (org *Org) printOnePhone(phone string, rerate bool) {
 		org.phoneTotalUsd += totalUsd
 		org.phoneTotalOrg += totalOrg
 		org.phonePrintControl.DetailsBlockExists = true
-		query := "SELECT event_time,numb,duration,rate_usd,rate_org FROM rated WHERE toYYYYMM(event_date)='" + org.Date + "' AND numb LIKE '8107%' AND numa='" + phone + "' ORDER BY event_time"
+		query := "SELECT event_time,numb,duration,rate_usd,rate_org,kz FROM rated WHERE toYYYYMM(event_date)='" + org.Date + "' AND numb LIKE '8107%' AND numa='" + phone + "' ORDER BY event_time"
 		org.callsDetails(query, phone)
 		s := fmt.Sprintf("%7s%-51s%10.2f%10.2f", "", "Всего по телефону разговоров по СНГ", totalUsd, totalOrg)
 		org.addLine(s)
@@ -146,7 +148,7 @@ func (org *Org) printOnePhone(phone string, rerate bool) {
 	totalUsd, totalOrg = getSum(query)
 
 	if totalOrg > 0 && !rerate {
-		query := "SELECT event_time,numb,duration,rate_usd,rate_org FROM rated WHERE toYYYYMM(event_date)='" + org.Date + "' AND numb LIKE '8%' AND numb NOT LIKE '810%' AND numa='" + phone + "' ORDER BY event_time"
+		query := "SELECT event_time,numb,duration,rate_usd,rate_org,kz FROM rated WHERE toYYYYMM(event_date)='" + org.Date + "' AND numb LIKE '8%' AND numb NOT LIKE '810%' AND numa='" + phone + "' ORDER BY event_time"
 		org.callsDetails(query, phone)
 	}
 	if totalOrg > 0 && rerate {
@@ -263,7 +265,7 @@ func (org *Org) callsDetails(query, phone string) {
 	count := 0
 	for rows.Next() {
 		var cd CallDetail
-		if err := rows.Scan(&cd.DTime, &cd.Numb, &cd.DurSec, &cd.Usd, &cd.Man); err != nil {
+		if err := rows.Scan(&cd.DTime, &cd.Numb, &cd.DurSec, &cd.Usd, &cd.Man, &cd.Kz); err != nil {
 			panic(err.Error())
 		}
 		if count == 0 {
@@ -286,7 +288,7 @@ func (org *Org) prepareDetailRow(cd CallDetail) {
 
 	//Convert to 25.06.20
 	date := string(dateRunes[8:]) + "." + string(dateRunes[5:7]) + "." + strconv.Itoa(yy)
-	alignedDstNumb := org.alignDstNumb(spn.Direction, spn.Remained)
+	alignedDstNumb := org.alignDstNumb(spn.Direction, spn.Remained,cd.Kz)
 	format := "%-7s%s %s%12s%6d%10.2f%10.2f"
 	s := fmt.Sprintf(format, "", date, alignedDstNumb, odt.Time, secToMin(cd.DurSec), cd.Usd, cd.Man)
 	if cd.PrintNuma {
