@@ -13,6 +13,10 @@ func (org *Org) alignDstNumb(dst, numb string,kz int) string {
 	if kz != 0 {
 	    kzStr = "(к/з)"
 	}
+
+//Remove when Feb comes
+	kzStr = ""
+
 	l1 := len([]rune(dst))
 	lKz := len([]rune(kzStr))
 	l2 := 24 - l1 - lKz

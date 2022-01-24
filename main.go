@@ -3,33 +3,49 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"os"
+
 	"github.com/gammazero/workerpool"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/joho/godotenv"
 	_ "github.com/mailru/go-clickhouse"
 	"github.com/sirupsen/logrus"
-	"os"
 )
 
 var asudb *sql.DB
 var chdb *sql.DB
 var log = logrus.New()
 
+func getDSN(fn string) (string, string) {
+	err := godotenv.Load(os.ExpandEnv(fn))
+	if err != nil {
+		panic(err.Error())
+	}
+	tsdb := os.Getenv("TS_DB")
+	asudb := os.Getenv("DB_DSN")
+
+	return tsdb, asudb
+}
+
 func main() {
 
-	if len(os.Args) < 2 {
-		fmt.Printf("Usage: %s <YYYYMM> <dual>(optional)\n", os.Args[0])
+	if len(os.Args) < 3 {
+		fmt.Printf("Usage: %s <YYYYMM> db.conf <dual>(optional)\n", os.Args[0])
 		return
 	}
 
 	date := os.Args[1]
 
+	chDb, asuDb := getDSN(os.Args[2])
+	fmt.Println(chDb, asuDb)
+
 	var dual string
-	if len(os.Args) == 3 {
-		dual = os.Args[2]
+	if len(os.Args) == 4 {
+		dual = os.Args[3]
 	}
 
 	initLog(date)
-	initDB()
+	initDB(chDb, asuDb)
 	defer chdb.Close()
 	defer asudb.Close()
 	loadPrefixes()
@@ -61,15 +77,17 @@ func main() {
 	reestr.closeFiles()
 }
 
-func initDB() {
+func initDB(chDb, asuDb string) {
 	var err error
 	//Init clickhouse
-	chdb, err = sql.Open("clickhouse", "http://default:te410pte412p@10.19.64.124:8123/asubill?debug=true")
+	//chdb, err = sql.Open("clickhouse", "http://default:te410pte412p@10.19.64.124:8123/asubill?debug=true")
+	chdb, err = sql.Open("clickhouse", chDb)
 	if err != nil {
 		panic(err.Error())
 	}
 	//Init ASUDB
-	asudb, err = sql.Open("mysql", "asu:qwerty@tcp(localhost:3308)/agts_asu")
+	//asudb, err = sql.Open("mysql", "asu:qwerty@tcp(localhost:3308)/agts_asu")
+	asudb, err = sql.Open("mysql", asuDb)
 	if err != nil {
 		panic(err.Error())
 	}

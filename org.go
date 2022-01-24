@@ -3,11 +3,12 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/mailru/go-clickhouse"
 	"math"
 	"regexp"
 	"strconv"
+
+	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/mailru/go-clickhouse"
 )
 
 type CallDetail struct {
@@ -18,7 +19,7 @@ type CallDetail struct {
 	Usd       float64
 	Man       float64
 	PrintNuma bool
-	Kz	  int
+	Kz        int
 }
 
 type TotalDual struct {
@@ -66,16 +67,27 @@ func (org *Org) printOneOrg() {
 	defer rows.Close()
 
 	org.addHeader()
+	//Create sorted array of phones
+	//Create unsorted map of each phones details
+
+	//Create output channel for each phone details
+	//Fork channel reader coroutine
+
+	//Channel writer with each phone
 	for rows.Next() {
 		var phone string
+		//put phone to sorted array
 		m := false
 		if err := rows.Scan(&phone); err != nil {
 			panic(err.Error())
 		}
 		m, _ = regexp.MatchString(`4438[0-6][0-9]`, phone)
-
+		//fork coroutine with writing to channel
 		org.printOnePhone(phone, m)
 	}
+	//Sort array of phone
+	//Print unsorted map with sorted array index
+
 	if org.addFooter() {
 		org.printPageToFile()
 		org.addToReestr()
@@ -288,7 +300,7 @@ func (org *Org) prepareDetailRow(cd CallDetail) {
 
 	//Convert to 25.06.20
 	date := string(dateRunes[8:]) + "." + string(dateRunes[5:7]) + "." + strconv.Itoa(yy)
-	alignedDstNumb := org.alignDstNumb(spn.Direction, spn.Remained,cd.Kz)
+	alignedDstNumb := org.alignDstNumb(spn.Direction, spn.Remained, cd.Kz)
 	format := "%-7s%s %s%12s%6d%10.2f%10.2f"
 	s := fmt.Sprintf(format, "", date, alignedDstNumb, odt.Time, secToMin(cd.DurSec), cd.Usd, cd.Man)
 	if cd.PrintNuma {
